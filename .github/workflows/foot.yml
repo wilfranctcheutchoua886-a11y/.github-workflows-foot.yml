@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyseur Foot - Modèle Elo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#0a1a0a;font-family:Arial,sans-serif;color:#fff;padding:14px;max-width:560px;margin:0 auto}
+h1{text-align:center;font-size:21px;color:#00ff88}
+p.sub{text-align:center;color:#aaa;font-size:13px;margin:5px 0 14px}
+.top{background:linear-gradient(135deg,#00c853,#004d00);border-radius:16px;padding:16px;text-align:center}
+.top .lbl{font-size:13px}
+#accuracy{font-size:44px;font-weight:900;color:#ffcc00}
+#base{font-size:13px}
+#sample{font-size:12px;margin-top:4px}
+#statusNet{font-size:13px;margin-top:8px}
+.card{background:#111e11;border-radius:14px;padding:14px;margin-top:12px;border:1px solid #2a4a2a}
+.card h2{font-size:16px;margin-bottom:8px}
+input,select{width:100%;padding:12px;border-radius:10px;background:#0a1a0a;color:#fff;font-size:16px;margin:6px 0;outline:none;border:1px solid #444}
+button{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:bold;margin-top:8px;cursor:pointer}
+button:disabled{opacity:.5}
+.btnGreen{background:#00c853;color:#fff}
+.btnBlue{background:#2962ff;color:#fff}
+.btnWhite{background:#fff;color:#000}
+.btnGray{background:#334155;color:#fff}
+.row{display:flex;gap:8px}
+.item{background:#0a1a0a;padding:11px;border-radius:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.item b{font-size:14px}
+.item small{display:block;color:#aaa;font-size:11px}
+.ok{color:#00ff88;font-weight:bold}
+.muted{color:#aaa;font-size:13px}
+#log{background:#000;padding:10px;border-radius:10px;font-size:12px;height:130px;overflow:auto;color:#0f0;margin-top:8px}
+#pronoBox{display:none;background:#ffcc00;color:#000;border-radius:14px;padding:16px;margin-top:12px;text-align:center}
+#pronoBox p{margin-top:6px;font-size:14px}
+#pronoBox .warn{font-size:11px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#334155;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90%;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<h1>⚽ ANALYSEUR FOOT</h1>
+<p class="sub">Modèle Elo calculé sur de vrais résultats (TheSportsDB)</p>
+
+<div class="top">
+<div class="lbl">Précision mesurée du modèle</div>
+<div id="accuracy">--</div>
+<div id="base">Référence « toujours domicile » : --</div>
+<div id="sample">Matchs en mémoire : <span id="matchCount">0</span> | Testés : <span id="testCount">0</span></div>
+<div id="sampleWarn" style="font-size:12px"></div>
+<div id="statusNet">🌐 Internet : non vérifié</div>
+<button class="btnWhite" id="btnAuto">🌐 CHARGER 3 LIGUES</button>
+</div>
+
+<div class="card">
+<h2>📡 1. Charger des résultats</h2>
+<select id="ligue">
+<option value="4328">Premier League - Angleterre</option>
+<option value="4335">La Liga - Espagne</option>
+<option value="4334">Ligue 1 - France</option>
+<option value="4332">Serie A - Italie</option>
+<option value="4331">Bundesliga - Allemagne</option>
+<option value="4480">Champions League</option>
+<option value="4329">Championship - Angleterre 2</option>
+</select>
+<button class="btnBlue" id="btnSearch">🔍 CHARGER CETTE LIGUE</button>
+<div id="searchResult" class="muted" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
+<h2>🎯 2. Estimer un match</h2>
+<p class="muted">Les équipes viennent des matchs chargés pour la ligue choisie ci-dessus.</p>
+<div class="row">
+<select id="pEq1"></select>
+<select id="pEq2"></select>
+</div>
+<p class="muted" style="margin-top:6px">Cotes du bookmaker (facultatif) :</p>
+<div class="row">
+<input type="number" id="pCote1" placeholder="Cote 1" step="0.01" min="1.01" inputmode="decimal">
+<input type="number" id="pCoteN" placeholder="Cote N" step="0.01" min="1.01" inputmode="decimal">
+<input type="number" id="pCote2" placeholder="Cote 2" step="0.01" min="1.01" inputmode="decimal">
+</div>
+<button class="btnGreen" id="btnProno">🔮 ESTIMER</button>
+</div>
+
+<div id="pronoBox">
+<h2 id="pronoResult"></h2>
+<p id="pronoDetail"></p>
+<p id="pronoOdds"></p>
+<p class="warn">⚠️ Estimation statistique, pas une certitude. Les bookmakers prélèvent une marge : miser sur ces résultats fait perdre de l'argent sur la durée. Ne mise que ce que tu peux perdre.</p>
+<button class="btnGray" style="background:#000" id="btnClose">FERMER</button>
+</div>
+
+<div class="card">
+<h2>📊 3. Derniers matchs chargés</h2>
+<div id="history"></div>
+<button class="btnGray" id="btnReset">🔄 VIDER LA MÉMOIRE</button>
+</div>
+
+<div class="card">
+<h2>📜 Journal</h2>
+<div id="log"></div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const API_KEY = '3'; // clé gratuite publique de TheSportsDB
+const K = 20, HOME_ADV = 60, START = 1500, WARMUP = 3;
+
+function load(key, fb){ try{ const v = JSON.parse(localStorage.getItem(key)); return v ?? fb; }catch(e){ return fb; } }
+function store(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch(e){} }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let matchs = load('foot_matchs', []);
+if(!Array.isArray(matchs)) matchs = [];
+let logs = [];
+let busy = false;
+
+let toastTimer;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function log(msg){
+  logs.unshift(new Date().toLocaleTimeString() + ' - ' + msg);
+  logs = logs.slice(0, 80);
+  $('log').innerHTML = logs.map(esc).join('<br>');
+}
+
+/* ---------- Modèle Elo ---------- */
+function sorted(){
+  return matchs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)));
+}
+function predictProbs(r, h, a){
+  const dr = (r[h] ?? START) - (r[a] ?? START) + HOME_ADV;
+  const E = 1 / (1 + Math.pow(10, -dr / 400));
+  const pd = 0.30 - 0.15 * Math.abs(2 * E - 1);
+  return [(1 - pd) * E, pd, (1 - pd) * (1 - E)];
+}
+function argmax(p){ return p.indexOf(Math.max(...p)); }
+function build(){
+  // Parcourt les matchs dans l'ordre : prédit AVANT de mettre à jour => précision réelle.
+  const r = {}, played = {};
+  let tested = 0, good = 0, goodBase = 0;
+  for(const m of sorted()){
+    const real = m.b1 > m.b2 ? 0 : m.b1 === m.b2 ? 1 : 2;
+    if((played[m.e1] || 0) >= WARMUP && (played[m.e2] || 0) >= WARMUP){
+      tested++;
+      if(argmax(predictProbs(r, m.e1, m.e2)) === real) good++;
+      if(real === 0) goodBase++;
+    }
+    const dr = (r[m.e1] ?? START) - (r[m.e2] ?? START) + HOME_ADV;
+    const E = 1 / (1 + Math.pow(10, -dr / 400));
+    const S = real === 0 ? 1 : real === 1 ? 0.5 : 0;
+    r[m.e1] = (r[m.e1] ?? START) + K * (S - E);
+    r[m.e2] = (r[m.e2] ?? START) - K * (S - E);
+    played[m.e1] = (played[m.e1] || 0) + 1;
+    played[m.e2] = (played[m.e2] || 0) + 1;
+  }
+  return {r, tested, acc: tested ? good / tested : null, base: tested ? goodBase / tested : null};
+}
+
+/* ---------- Affichage ---------- */
+function updateUI(){
+  const m = build();
+  $('matchCount').textContent = matchs.length;
+  $('testCount').textContent = m.tested;
+  $('accuracy').textContent = m.acc == null ? '--' : Math.round(m.acc * 100) + '%';
+  $('base').textContent = 'Référence « toujours domicile » : ' + (m.base == null ? '--' : Math.round(m.base * 100) + '%');
+  $('sampleWarn').textContent = (m.tested > 0 && m.tested < 30) ? '⚠️ Échantillon trop petit pour conclure' : '';
+  const h = $('history');
+  if(!matchs.length){ h.innerHTML = '<p class="muted">Aucun match. Charge une ligue.</p>'; }
+  else{
+    h.innerHTML = sorted().slice(-8).reverse().map(x =>
+      '<div class="item"><div><b>' + esc(x.e1) + ' ' + x.b1 + ' - ' + x.b2 + ' ' + esc(x.e2) + '</b><small>' + esc(x.ligue) + ' | ' + esc(x.date) + '</small></div><span class="ok">' + (x.b1 > x.b2 ? '1' : x.b1 === x.b2 ? 'N' : '2') + '</span></div>'
+    ).join('');
+  }
+  fillTeams();
+}
+function fillTeams(){
+  const lg = $('ligue').value;
+  const teams = [...new Set(matchs.filter(x => x.lid === lg).flatMap(x => [x.e1, x.e2]))].sort();
+  for(const id of ['pEq1', 'pEq2']){
+    const sel = $(id), old = sel.value;
+    sel.innerHTML = teams.length ? teams.map(t => '<option>' + esc(t) + '</option>').join('') : '<option value="">(charge la ligue)</option>';
+    if(teams.includes(old)) sel.value = old;
+  }
+  if(teams.length > 1 && $('pEq1').value === $('pEq2').value) $('pEq2').selectedIndex = 1;
+}
+
+/* ---------- Recherche Internet ---------- */
+function seasonStr(){
+  const d = new Date(), y = d.getFullYear();
+  return d.getMonth() >= 6 ? y + '-' + (y + 1) : (y - 1) + '-' + y;
+}
+async function getJson(url){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12000);
+  try{
+    const res = await fetch(url, {signal: ctrl.signal});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally { clearTimeout(t); }
+}
+async function chargerLigue(lid, nom){
+  const base = 'https://www.thesportsdb.com/api/v1/json/' + API_KEY + '/';
+  let events = [];
+  try{
+    const d = await getJson(base + 'eventspastleague.php?id=' + lid);
+    events = events.concat(d.events || []);
+  }catch(e){ log('Derniers matchs indisponibles (' + nom + ') : ' + e.message); }
+  try{
+    const d = await getJson(base + 'eventsseason.php?id=' + lid + '&s=' + seasonStr());
+    events = events.concat(d.events || []);
+  }catch(e){ log('Saison indisponible (' + nom + ') : ' + e.message); }
+  if(!events.length) throw new Error('aucune donnée reçue');
+
+  let ajoutes = 0, vus = new Set(matchs.map(m => String(m.id)));
+  for(const ev of events){
+    if(ev.intHomeScore == null || ev.intAwayScore == null || ev.intHomeScore === '' || ev.intAwayScore === '') continue;
+    const b1 = parseInt(ev.intHomeScore, 10), b2 = parseInt(ev.intAwayScore, 10);
+    if(isNaN(b1) || isNaN(b2)) continue;
+    const id = ev.idEvent || (ev.strHomeTeam + ev.strAwayTeam + ev.dateEvent);
+    if(vus.has(String(id))) continue;
+    vus.add(String(id));
+    matchs.push({id, lid, ligue: nom, e1: ev.strHomeTeam, e2: ev.strAwayTeam, b1, b2, date: ev.dateEvent || ''});
+    ajoutes++;
+  }
+  store('foot_matchs', matchs);
+  return ajoutes;
+}
+async function chercher(){
+  if(busy) return;
+  busy = true; setBusy(true);
+  const sel = $('ligue'), lid = sel.value, nom = sel.selectedOptions[0].text;
+  $('searchResult').textContent = '🌐 Recherche : ' + nom + '...';
+  try{
+    const n = await chargerLigue(lid, nom);
+    $('statusNet').textContent = '✅ Internet OK';
+    $('searchResult').textContent = n ? '✅ ' + n + ' nouveaux matchs ajoutés' : 'Aucun nouveau match (déjà en mémoire)';
+    log(nom + ' : ' + n + ' nouveaux matchs');
+  }catch(e){
+    $('statusNet').textContent = '⚠️ Internet : erreur';
+    $('searchResult').textContent = '⚠️ Échec : ' + e.message + '. Aucune donnée inventée n\'a été ajoutée.';
+    log('Erreur ' + nom + ' : ' + e.message);
+  }
+  busy = false; setBusy(false); updateUI();
+}
+async function chargerTrois(){
+  if(busy) return;
+  busy = true; setBusy(true);
+  let total = 0;
+  for(const [lid, nom] of [['4328', 'Premier League'], ['4335', 'La Liga'], ['4334', 'Ligue 1']]){
+    try{ const n = await chargerLigue(lid, nom); total += n; log(nom + ' : ' + n + ' nouveaux matchs'); $('statusNet').textContent = '✅ Internet OK'; }
+    catch(e){ log('Erreur ' + nom + ' : ' + e.message); $('statusNet').textContent = '⚠️ Internet : erreur'; }
+    await new Promise(r => setTimeout(r, 800));
+  }
+  toast(total + ' matchs ajoutés');
+  busy = false; setBusy(false); updateUI();
+}
+function setBusy(b){ for(const id of ['btnAuto', 'btnSearch']) $(id).disabled = b; }
+
+/* ---------- Estimation ---------- */
+function estimer(){
+  const e1 = $('pEq1').value, e2 = $('pEq2').value;
+  if(!e1 || !e2){ toast('Charge d\'abord une ligue'); return; }
+  if(e1 === e2){ toast('Choisis 2 équipes différentes'); return; }
+  const m = build();
+  const p = predictProbs(m.r, e1, e2);
+  const pct = p.map(x => Math.round(x * 100));
+  const noms = ['1 (' + e1 + ' gagne)', 'N (match nul)', '2 (' + e2 + ' gagne)'];
+  $('pronoBox').style.display = 'block';
+  $('pronoResult').textContent = e1 + ' vs ' + e2 + ' → ' + noms[argmax(p)];
+  $('pronoDetail').textContent = 'Probabilités du modèle — 1 : ' + pct[0] + '% | N : ' + pct[1] + '% | 2 : ' + pct[2] + '%';
+  const c = ['pCote1', 'pCoteN', 'pCote2'].map(id => parseFloat($(id).value));
+  if(c.every(x => x > 1)){
+    const imp = c.map(x => 1 / x), tot = imp.reduce((a, b) => a + b, 0);
+    const ip = imp.map(x => Math.round(x / tot * 100));
+    $('pronoOdds').textContent = 'Selon les cotes — 1 : ' + ip[0] + '% | N : ' + ip[1] + '% | 2 : ' + ip[2] + '% (marge du bookmaker : ' + Math.round((tot - 1) * 100) + '%)';
+  }else{
+    $('pronoOdds').textContent = '';
+  }
+  log('Estimation ' + e1 + ' vs ' + e2 + ' : ' + pct.join('/'));
+}
+
+/* ---------- Événements ---------- */
+$('btnAuto').onclick = chargerTrois;
+$('btnSearch').onclick = chercher;
+$('btnProno').onclick = estimer;
+$('btnClose').onclick = () => { $('pronoBox').style.display = 'none'; };
+$('ligue').onchange = fillTeams;
+$('btnReset').onclick = () => {
+  if(!matchs.length){ toast('Mémoire déjà vide'); return; }
+  if(!confirm('Vider tous les matchs en mémoire ?')) return;
+  matchs = []; store('foot_matchs', matchs); updateUI(); log('Mémoire vidée');
+};
+log('Prêt. Charge une ligue pour commencer.');
+updateUI();
+</script>
+</body>
+</html>
